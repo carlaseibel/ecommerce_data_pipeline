@@ -1,0 +1,42 @@
+[
+  {
+    "order_id": "O1001",
+    "customer_id": 1,
+    "amount": 250.50,
+    "currency": "BRL",
+    "status": "completed",
+    "order_date": "2023-07-10"
+  },
+  {
+    "order_id": "O1002",
+    "customer_id": 2,
+    "amount": 99.90,
+    "currency": "USD",
+    "status": "CANCELLED",
+    "order_date": "2023-07-11"
+  },
+  {
+    "order_id": "O1003",
+    "customer_id": null,
+    "amount": 180.00,
+    "currency": "USD",
+    "status": "completed",
+    "order_date": "2023-07-12"
+  },
+  {
+    "order_id": "O1004",
+    "customer_id": 4,
+    "amount": -50.00,
+    "currency": "BRL",
+    "status": "Completed",
+    "order_date": "2023-07-13"
+  },
+  {
+    "order_id": "O1005",
+    "customer_id": 99,
+    "amount": 300.00,
+    "currency": "EUR",
+    "status": "completed",
+    "order_date": "13-07-2023"
+  }
+]

@@ -1,0 +1,6 @@
+{"event_id":"E1","customer_id":1,"event_type":"login","event_timestamp":"2023-07-10T10:01:00Z"}
+{"event_id":"E2","customer_id":1,"event_type":"purchase","event_timestamp":"2023-07-10T10:05:00Z"}
+{"event_id":"E3","customer_id":2,"event_type":"login","event_timestamp":"2023-07-11T09:00:00Z"}
+{"event_id":"E4","customer_id":99,"event_type":"login","event_timestamp":"2023-07-11T09:10:00Z"}
+{"event_id":"E5","customer_id":3,"event_type":"LOG_IN","event_timestamp":"2023-07-11T09:15:00Z"}
+{"event_id":"E6","customer_id":3,"event_type":"login","event_timestamp":"invalid_timestamp"}

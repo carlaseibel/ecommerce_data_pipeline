@@ -1,0 +1,8 @@
+customer_id,name,email,country,created_at
+1,Ana Silva,ana@email.com,BR,2022-01-10
+2,John Doe,john@email.com,US,2021-11-03
+3,Maria Gomez,maria@email.com,AR,2023-02-20
+3,Maria Gomez,maria@email.com,AR,2023-02-20
+4,Carlos Pereira,carlos@email.com,BR,2023-05-15
+5,,empty_name@email.com,BR,2023-06-01
+6,Julia Smith,julia@email.com,,2023-06-10
