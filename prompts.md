@@ -141,3 +141,31 @@ a network issue.
 default. `environment:` overrides `env_file:`, so locally the `.env` value still wins
 (the interpolation default is empty); in CI, the workflow-level secret flows runner →
 compose interpolation → container.
+
+---
+
+## 2026-05-01 — CD: publish image to GHCR; drop `publish-data-docs`
+
+**Why:** Challenge Part 8 requires only build, test, run pipeline, validate API
+starts — all already covered. A real deploy (Fly/Render/Cloud Run) would add infra,
+secrets, and runtime cost without serving the rubric, and the warehouse is a local
+SQLite artifact that wouldn't survive a stateless host anyway. Publishing the
+Docker image to GHCR is the minimal credible CD increment: it proves the artifact is
+portable, costs nothing, needs no extra secrets (`GITHUB_TOKEN` is auto-provisioned),
+and lets a reviewer `docker pull` and run the same image CI tested.
+
+The previous `publish-data-docs` job was Great-Expectations-specific (uploaded
+`gx/uncommitted/data_docs/local_site`); GX has been removed from the project, so the
+job was dead code and was replaced rather than kept.
+
+**How to apply:**
+- New `publish-image` job in `.github/workflows/ci.yml`, gated on
+  `needs: [pipeline, api-smoke]` and `if: github.ref == 'refs/heads/master'` so PRs
+  don't publish.
+- Tags: `ghcr.io/<repo>:${{ github.sha }}` (immutable, traceable to a commit) and
+  `:latest` (convenience for README pulls). No `:master` tag — `latest` already
+  serves that purpose on a single-branch repo.
+- `permissions: packages: write` is set at the job level, not workflow level — least
+  privilege; lint/test/build don't need write access to the registry.
+- Manual one-time step outside the workflow: set the GHCR package visibility to
+  Public after the first push, otherwise reviewers hit 401.

@@ -71,16 +71,25 @@ jobs:
       - run: make pipeline
       - run: make api-smoke
 
-  publish-data-docs:
+  publish-image:
     runs-on: ubuntu-latest
-    needs: pipeline
+    needs: [pipeline, api-smoke]
+    if: github.ref == 'refs/heads/master'
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
-      - run: make build
-      - run: cp .env.example .env
-      - run: make pipeline
-      - run: make data-docs
-      - uses: actions/upload-artifact@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
         with:
-          name: data-docs
-          path: gx/uncommitted/data_docs/local_site
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ github.sha }}
+            ghcr.io/${{ github.repository }}:latest
