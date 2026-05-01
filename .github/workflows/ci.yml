@@ -5,6 +5,9 @@ on:
     branches: [master]
   pull_request:
 
+env:
+  EXCHANGE_RATE_API_KEY: ${{ secrets.EXCHANGE_RATE_API_KEY }}
+
 jobs:
   lint:
     runs-on: ubuntu-latest
