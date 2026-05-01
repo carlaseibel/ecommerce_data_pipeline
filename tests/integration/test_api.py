@@ -7,8 +7,8 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from src.api.main import create_app
 from src.api.deps import get_db
+from src.api.main import create_app
 from src.pipeline import (
     enrich_exchange_rates,
     ingest_customers,

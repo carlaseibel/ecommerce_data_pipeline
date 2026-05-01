@@ -49,7 +49,5 @@ def test_full_pipeline(tmp_warehouse, validations_dir, fake_exchange_client) -> 
     assert len(dq) == 4
     assert all(row["success"] == 1 for row in dq)
 
-    staging_count = tmp_warehouse.execute(
-        "SELECT COUNT(*) FROM staging_orders"
-    ).fetchone()[0]
+    staging_count = tmp_warehouse.execute("SELECT COUNT(*) FROM staging_orders").fetchone()[0]
     assert staging_count == 0

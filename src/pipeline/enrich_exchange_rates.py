@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
@@ -34,7 +34,7 @@ def run(
     run_id: str,
 ) -> None:
     log = get_logger(STAGE)
-    started_at = datetime.now(timezone.utc)
+    started_at = datetime.now(UTC)
     t0 = time.perf_counter()
 
     currencies = _staged_currencies(conn)
@@ -43,7 +43,7 @@ def run(
         return
 
     rates = client.fetch_rates_to_usd(currencies)
-    fetched_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    fetched_at = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     df = pd.DataFrame(
         [
@@ -71,9 +71,7 @@ def run(
         )
         raise RuntimeError(f"{CHECKPOINT} failed")
 
-    rows = [
-        (r.currency, r.rate_to_usd, r.fetched_at) for r in df.itertuples(index=False)
-    ]
+    rows = [(r.currency, r.rate_to_usd, r.fetched_at) for r in df.itertuples(index=False)]
     conn.executemany(
         "INSERT OR REPLACE INTO exchange_rates (currency, rate_to_usd, fetched_at) "
         "VALUES (?, ?, ?)",

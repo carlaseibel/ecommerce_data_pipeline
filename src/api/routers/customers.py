@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 
@@ -11,13 +12,15 @@ from src.api.schemas import Customer, CustomerListResponse
 
 router = APIRouter()
 
+DbConn = Annotated[sqlite3.Connection, Depends(get_db)]
+
 
 @router.get("/customers", response_model=CustomerListResponse)
 def list_customers(
+    conn: DbConn,
     country: str | None = Query(default=None, min_length=2, max_length=2),
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
-    conn: sqlite3.Connection = Depends(get_db),
 ) -> CustomerListResponse:
     where = "WHERE country = ?" if country else ""
     params: tuple = (country,) if country else ()

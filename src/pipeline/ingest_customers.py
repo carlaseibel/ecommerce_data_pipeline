@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
@@ -19,7 +19,7 @@ SUITE = "customers"
 
 def run(conn: sqlite3.Connection, raw_dir: Path, validations_dir: Path, run_id: str) -> None:
     log = get_logger(STAGE)
-    started_at = datetime.now(timezone.utc)
+    started_at = datetime.now(UTC)
     t0 = time.perf_counter()
 
     df = pd.read_csv(raw_dir / "customers.csv", dtype={"customer_id": "Int64"})

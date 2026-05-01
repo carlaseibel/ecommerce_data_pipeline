@@ -1,8 +1,9 @@
-"""GET /data-quality — latest GX checkpoint summary per stage from data_quality_runs."""
+"""GET /data-quality — latest checkpoint summary per stage from data_quality_runs."""
 
 from __future__ import annotations
 
 import sqlite3
+from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
@@ -11,9 +12,11 @@ from src.api.schemas import DataQualityResponse, DataQualityRun
 
 router = APIRouter()
 
+DbConn = Annotated[sqlite3.Connection, Depends(get_db)]
+
 
 @router.get("/data-quality", response_model=DataQualityResponse)
-def get_data_quality(conn: sqlite3.Connection = Depends(get_db)) -> DataQualityResponse:
+def get_data_quality(conn: DbConn) -> DataQualityResponse:
     latest = conn.execute(
         "SELECT run_id FROM data_quality_runs ORDER BY started_at DESC LIMIT 1"
     ).fetchone()

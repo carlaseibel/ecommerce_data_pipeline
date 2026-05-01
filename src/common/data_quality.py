@@ -6,10 +6,10 @@ import json
 import re
 import sqlite3
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Callable
 
 import pandas as pd
 
@@ -160,7 +160,7 @@ def record_run(
             int(result.success),
             result.evaluated,
             result.succeeded,
-            started_at.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            started_at.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
             duration_ms,
         ),
     )

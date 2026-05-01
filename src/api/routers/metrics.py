@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
@@ -16,9 +17,11 @@ from src.api.schemas import (
 
 router = APIRouter()
 
+DbConn = Annotated[sqlite3.Connection, Depends(get_db)]
+
 
 @router.get("/metrics", response_model=MetricsResponse)
-def get_metrics(conn: sqlite3.Connection = Depends(get_db)) -> MetricsResponse:
+def get_metrics(conn: DbConn) -> MetricsResponse:
     revenue = conn.execute(
         """
         SELECT customer_id, ROUND(SUM(amount_usd), 2) AS revenue_usd

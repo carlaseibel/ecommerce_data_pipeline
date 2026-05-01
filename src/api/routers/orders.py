@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 
@@ -11,15 +12,17 @@ from src.api.schemas import Order, OrderListResponse
 
 router = APIRouter()
 
+DbConn = Annotated[sqlite3.Connection, Depends(get_db)]
+
 
 @router.get("/orders", response_model=OrderListResponse)
 def list_orders(
+    conn: DbConn,
     customer_id: int | None = Query(default=None),
     status: str | None = Query(default=None),
     currency: str | None = Query(default=None, min_length=3, max_length=3),
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
-    conn: sqlite3.Connection = Depends(get_db),
 ) -> OrderListResponse:
     clauses: list[str] = []
     params: list = []
