@@ -1,6 +1,6 @@
-# Ecommerce Data Pipeline
+# E-commerce Data Pipeline Project
 
-Containerized ecommerce data pipeline that:
+This repo contains an containerized ecommerce data pipeline as part of techinical challenge deliverable of beecrowd for Eneva. This batch pipeline:
 
 1. Ingests local CSV / JSON / JSONL files (`raw_data/`)
 2. Cleans, deduplicates, normalizes, and quarantines bad rows into an `error_events` table
@@ -9,21 +9,21 @@ Containerized ecommerce data pipeline that:
 5. Validates each pipeline stage against declarative JSON rule-sets in `validations/`
 6. Serves the data and run results through a FastAPI app
 
-Reference docs:
+Here you can access reference documentation:
 - **Architecture:** [`docs/data_architecture.md`](docs/data_architecture.md)
-- **Decision log:** [`prompts.md`](prompts.md)
+- **Decision log:** [`prompts.md`](prompts.md) - Used Claude Code with VS Code in grant permission mode.
 - **Original challenge:** [`technical_challenge.md`](technical_challenge.md)
 
 ---
 
-## Prerequisites
+## Pre-Reqs:
 
 - **Docker** (24+) with the `docker compose` plugin
 - **Make** (optional but recommended) — Windows users: `winget install ezwinports.make`
 - **An exchangerate-api.com API key** (free tier works) — sign up at
   https://www.exchangerate-api.com/ and copy the key
 
-For purely local runs (no Docker) you also need:
+For purely local runs (on Docker) you also need:
 - **Python 3.11+** (3.11–3.14 supported)
 
 ---
@@ -76,7 +76,7 @@ Every target delegates to `docker compose`, so the same commands run identically
 | `make api-smoke` | Boots the API, hits `/healthz`, `/data-quality`, `/customers?limit=1`, then tears down |
 | `make clean` | Deletes `data/*.sqlite` and `__pycache__` |
 
-### Direct `docker compose` equivalents (no Make)
+### Direct `docker compose` equivalents 
 
 ```bash
 docker compose build
@@ -117,7 +117,7 @@ uvicorn src.api.main:app --reload   # API at http://localhost:8000
 
 The orchestrator (`src/pipeline/run.py`) runs five stages in order. Any failure aborts
 the run with a non-zero exit. Each stage emits structured JSON logs to stdout and writes
-a row to the `data_quality_runs` table.
+a row to the `data_quality_runs` table for active monitoring.
 
 | # | Stage | Reads | Writes |
 |---|---|---|---|
@@ -237,9 +237,9 @@ GitHub Secrets. Locally they come from `.env`.
 
 ---
 
-## Technical decisions (high level)
+## Main technical decisions 
 
-Full rationale is in [`prompts.md`](prompts.md) (chronological decision log) and
+Full rationale is in [`prompts.md`](prompts.md) (chronological decision log using LLM Opus 4.7) and
 [`docs/data_architecture.md`](docs/data_architecture.md). The headline decisions:
 
 ### Storage and modeling
@@ -256,21 +256,21 @@ Full rationale is in [`prompts.md`](prompts.md) (chronological decision log) and
 ### Data quality
 
 - **Declarative JSON specs in `validations/`** with a small pandas-based runner in
-  `src/common/data_quality.py`. Six rule types cover everything we need: `column_exists`,
+  `src/common/data_quality.py`. Six rule types are supported, which cover everything that is needed: `column_exists`,
   `not_null`, `unique`, `between`, `in_set`, `matches_strftime`, `matches_regex`.
-  *Earlier revisions used Great Expectations 1.x — removed because the runtime cost of
-  debugging GX serialization issues exceeded the benefit for our small ruleset (full
+  *Great Expectations 1.x was used in earlier revisions — it was removed because the runtime cost of
+  debugging GX serialization issues was outweighed by the benefit for our small ruleset (full
   story in `prompts.md`).*
-- **Quarantine, not reject.** Rows that fail pre-filters go into `error_events` with a
-  stable `reason` code and the original payload — visible via `/data-quality` and
+- **Quarantined, not rejected.** Rows that fail pre-filters are sent to `error_events` with a
+  stable `reason` code and the original payload — these can be viewed via `/data-quality` and
   `/error-events`. The warehouse contract (only clean rows) is unchanged.
-- **First-failing-reason wins per row** so a single defective row doesn't inflate
-  multiple reason counts. Pre-filter check order = de-facto reason priority.
-- **Post-clean rule-set still aborts the pipeline on failure.** With quarantine in
-  place, a rule-set fail signals drift between the pre-filter and the spec —
-  fail-fast on a real bug, not on data.
+- **First-failing-reason wins per row** so multiple reason counts are not inflated
+  by a single defective row. Pre-filter check order is treated as de-facto reason priority.
+- **The pipeline is still aborted by the post-clean rule-set on failure.** With quarantine in
+  place, a rule-set failure is taken to signal drift between the pre-filter and the spec —
+  a fail-fast is triggered on a real bug, not on data.
 
-### Exchange-rate enrichment
+### Exchange-rate API extraction for enrichment
 
 - **`exchangerate-api.com`** with the API key in the URL path. Falls back to
   `EXCHANGE_RATE_API_URL` env if the user wants a different base.
@@ -358,3 +358,9 @@ ecommerce_data_pipeline/
 ├── Dockerfile, docker-compose.yml, Makefile
 └── pyproject.toml, .env.example
 ```
+
+## Future works
+
+- **API**: Use separate layers such as routers, services (business logic), and repositories (data access). Routers should only handle HTTP concerns. Business logic should live in a service layer that can be tested without TestClient. Data access should be isolated in a repository layer with typed methods instead of raw SQL in handlers. This makes the API easier to test, swap storage backends, and reuse logic
+- **DB**: As volume increases, change the storage strategy from a local SQLite to a remote Postgres database. SQLite fits a single-file, container-friendly deliverable but does not scale for concurrent writers or remote access. 
+- **Orchestration**: Replace the run.py orchestrator with a real scheduler (Airflow, Prefect, or Dagster). Today all five stages run sequentially in one process — any failure aborts the whole run and retries require a full restart. A DAG-based scheduler would give per-stage retries, scheduled runs, backfills, and parallelism for independent stages. This is the natural next step once the pipeline runs on a recurring basis in production.
