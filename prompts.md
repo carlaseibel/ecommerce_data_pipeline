@@ -124,3 +124,20 @@ brittle `sleep 3`), and makes the Makefile targets one-liners.
 - Makefile delegates to compose; CI calls Make, so the chain stays single-sourced.
 - `env_file` references `.env` with `required: false` so the container falls back to
   defaults in `src/common/config.py` when no `.env` is present.
+
+## 2026-05-01 — Forward EXCHANGE_RATE_API_* into containers via `environment:`
+
+**Why:** CI sets `EXCHANGE_RATE_API_KEY` at the workflow level (runner env), but
+Docker Compose does not auto-inherit runner env into the container — only `env_file`
+and `environment:` are read. CI never creates a `.env`, so the container started with
+an empty key and `fetch_rates_to_usd` raised `EXCHANGE_RATE_API_KEY is not set`
+immediately (same-millisecond failure, observed in run `d1fd53b0dd30`). `tenacity`
+did not retry because `ExchangeRateError` is not in `retry_if_exception_type`, but
+its frames still appeared in the traceback, which is what made the failure look like
+a network issue.
+
+**How to apply:** Both services in `docker-compose.yml` now declare
+`environment: EXCHANGE_RATE_API_KEY: ${EXCHANGE_RATE_API_KEY:-}` and the URL with a
+default. `environment:` overrides `env_file:`, so locally the `.env` value still wins
+(the interpolation default is empty); in CI, the workflow-level secret flows runner →
+compose interpolation → container.
