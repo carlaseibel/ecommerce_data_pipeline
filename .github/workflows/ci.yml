@@ -7,7 +7,10 @@ on:
 
 env:
   EXCHANGE_RATE_API_KEY: ${{ secrets.EXCHANGE_RATE_API_KEY }}
-  EXCHANGE_RATE_API_URL: ${{ secrets.EXCHANGE_RATE_API_URL}}
+  EXCHANGE_RATE_API_URL: https://v6.exchangerate-api.com/v6
+  WAREHOUSE_PATH: data/warehouse.sqlite
+  RAW_DATA_DIR: raw_data
+  VALIDATIONS_DIR: validations
 
 jobs:
   lint:
@@ -49,7 +52,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: make build
-      - run: cp .env.example .env
       - run: make pipeline
       - run: |
           test -s data/warehouse.sqlite
