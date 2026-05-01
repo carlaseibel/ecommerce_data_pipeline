@@ -144,6 +144,75 @@ compose interpolation → container.
 
 ---
 
+## 2026-05-01 — Switch from reject-and-drop to quarantine-and-observe
+
+**Prompt:** "rewrite data architecture assuming that an event_type = refund is valid and
+create an error event table to track data quality issues" → redirected to: "Don't reject
+negative amount rows and any other cases, instead use quarantine approach with an error
+event table with active observability."
+
+### Key decisions and why
+
+- **Quarantine over rejection.** Pre-filters in `ingest_orders` / `ingest_events` /
+  `ingest_customers` no longer `continue` past bad rows silently. Each bad row is
+  inserted into `error_events` with a `reason` code, then the loop moves on. Drops were
+  invisible outside log lines; quarantine makes data-quality issues queryable, countable,
+  and exposed via the API. The warehouse contract is unchanged (only clean rows reach it).
+- **`error_events` schema (`sql/schema.sql`).** Generic across stages:
+  `(id, run_id, stage, source_record_id, reason, raw_payload, occurred_at)`. One table,
+  not per-stage tables — keeps the API endpoint and summary query trivial, and stages
+  just write their own `stage` value. `raw_payload` is a JSON string (TEXT) so analysts
+  can recover the original row without joining to source files.
+- **First-failing-reason wins per row.** A row with multiple defects (e.g. orphan
+  customer + bad date) gets one `error_events` entry, not many. Otherwise rejection
+  counts inflate and the same row appears under multiple reasons, complicating dashboards.
+  The order of checks is the de-facto reason priority.
+- **Refund stays out of the canonical `event_type` set.** Original instruction said
+  "refund is valid"; user reverted that and confirmed "no, don't add refund." So a
+  `refund` event would now route to `error_events` with `reason = in_set` (the post-clean
+  checkpoint failure for the row's event type). The validation suite remains the
+  authoritative list of canonical types.
+- **Reason codes are stable, machine-readable strings** (`customer_id_orphan`,
+  `amount_negative_or_invalid`, `timestamp_invalid`, `customer_id_duplicate`,
+  `json_parse_error`, etc.) — not human prose. Dashboards group by `reason`; humans read
+  the code, not a sentence. Less churn over time.
+- **Validation suite still aborts the pipeline on failure** (no change). With quarantine
+  in place, the post-clean checkpoint should always pass — so a failure now signals
+  *drift between the pre-filter and the suite*, which is exactly the bug we want
+  fail-fast on. Quarantine handles known bad rows; the gate catches unknown ones.
+- **Active observability via two endpoints.** `/data-quality` adds `error_events_summary`
+  (counts grouped by `stage` + `reason` for the latest `run_id`) — one round-trip, an
+  analyst sees pass/fail and quarantine counts together. `/error-events` (new) does
+  paginated drill-in with `run_id`/`stage`/`reason` filters when someone needs to see
+  the actual rows. Summary in the gate endpoint, drill-in in its own endpoint —
+  separation by access pattern.
+- **Customers duplicates are now quarantined too.** Previously `df.drop_duplicates`
+  silently discarded them (only a count appeared in the stage-complete log). Same
+  treatment as orders/events for consistency — every dropped row is now visible in
+  `error_events`.
+- **Quarantine inserts share the stage's transaction.** `data_quality.record_run` commits
+  before the suite-failure raise, so quarantined rows for a failed stage are still
+  persisted. Useful for forensics when drift between pre-filter and suite causes the gate
+  to abort.
+
+---
+
+## 2026-05-01 — Render container 500 on `/customers`
+
+**Why:** The Render deploy of the API image returned 500 for any warehouse query. Root
+cause: `Dockerfile` creates an empty `data/` and `.dockerignore` excludes `data/*.sqlite`,
+so the container ships with no SQLite tables; the first query against `customers` raised
+`no such table` and FastAPI translated it to 500. Render free tier disks are ephemeral,
+so the warehouse must be (re)built on every cold start.
+
+**How to apply:** `Dockerfile` `CMD` now runs the pipeline once before exec'ing uvicorn:
+`python -m src.pipeline.run && uvicorn src.api.main:app --host 0.0.0.0 --port ${PORT:-8000}`.
+Switched the hardcoded port to `${PORT:-8000}` to honour Render's injected `$PORT`. The
+pipeline depends on `EXCHANGE_RATE_API_KEY` being set on the Render service or the
+`enrich_exchange_rates` stage will abort and the API never comes up.
+
+---
+
 ## 2026-05-01 — CD: publish image to GHCR; drop `publish-data-docs`
 
 **Why:** Challenge Part 8 requires only build, test, run pipeline, validate API

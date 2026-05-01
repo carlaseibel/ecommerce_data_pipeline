@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
-from src.api.routers import customers, data_quality, metrics, orders
+from src.api.routers import customers, data_quality, error_events, metrics, orders
 from src.common.logging import configure
 
 
@@ -20,6 +20,7 @@ def create_app() -> FastAPI:
     app.include_router(orders.router)
     app.include_router(metrics.router)
     app.include_router(data_quality.router)
+    app.include_router(error_events.router)
     return app
 
 

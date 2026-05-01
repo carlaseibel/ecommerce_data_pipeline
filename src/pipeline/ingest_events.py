@@ -44,7 +44,7 @@ def run(conn: sqlite3.Connection, raw_dir: Path, validations_dir: Path, run_id: 
 
     customer_ids = _existing_customer_ids(conn)
     cleaned: list[dict] = []
-    skipped = 0
+    quarantined = 0
 
     with (raw_dir / "events.jsonl").open(encoding="utf-8") as fh:
         for line_no, line in enumerate(fh, start=1):
@@ -55,29 +55,38 @@ def run(conn: sqlite3.Connection, raw_dir: Path, validations_dir: Path, run_id: 
                 row = json.loads(line)
             except json.JSONDecodeError:
                 log.warning(
-                    "JSON parse failure",
-                    extra={"run_id": run_id, "record_id": f"line:{line_no}"},
+                    "Quarantined row",
+                    extra={
+                        "run_id": run_id,
+                        "record_id": f"line:{line_no}",
+                        "reason": "json_parse_error",
+                    },
                 )
-                skipped += 1
+                data_quality.quarantine(
+                    conn, run_id, STAGE, f"line:{line_no}", "json_parse_error", line
+                )
+                quarantined += 1
                 continue
 
             event_id = row.get("event_id")
             cid = row.get("customer_id")
             timestamp = _normalize_timestamp(row.get("event_timestamp"))
 
+            reason: str | None = None
             if timestamp is None:
+                reason = "timestamp_invalid"
+            elif cid is None:
+                reason = "customer_id_null"
+            elif int(cid) not in customer_ids:
+                reason = "customer_id_orphan"
+
+            if reason is not None:
                 log.warning(
-                    "Pre-filter dropped row: invalid timestamp",
-                    extra={"run_id": run_id, "record_id": event_id},
+                    "Quarantined row",
+                    extra={"run_id": run_id, "record_id": event_id, "reason": reason},
                 )
-                skipped += 1
-                continue
-            if cid is None or int(cid) not in customer_ids:
-                log.warning(
-                    "Pre-filter dropped row: orphaned customer_id",
-                    extra={"run_id": run_id, "record_id": event_id},
-                )
-                skipped += 1
+                data_quality.quarantine(conn, run_id, STAGE, event_id, reason, row)
+                quarantined += 1
                 continue
 
             cleaned.append(
@@ -129,7 +138,7 @@ def run(conn: sqlite3.Connection, raw_dir: Path, validations_dir: Path, run_id: 
         extra={
             "run_id": run_id,
             "records_loaded": len(rows),
-            "records_skipped": skipped,
+            "records_quarantined": quarantined,
             "duration_ms": duration_ms,
         },
     )

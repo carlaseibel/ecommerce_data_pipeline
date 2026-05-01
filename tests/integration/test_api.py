@@ -87,3 +87,23 @@ def test_data_quality(seeded_client: TestClient) -> None:
         "ingest_events",
         "enrich_exchange_rates",
     }
+    summary = {(s["stage"], s["reason"]): s["count"] for s in body["error_events_summary"]}
+    assert summary[("ingest_orders", "amount_negative_or_invalid")] == 1
+    assert summary[("ingest_events", "customer_id_orphan")] == 1
+
+
+def test_error_events_listing(seeded_client: TestClient) -> None:
+    resp = seeded_client.get("/error-events", params={"stage": "ingest_orders"})
+    assert resp.status_code == 200
+    body = resp.json()
+    reasons = {item["reason"] for item in body["items"]}
+    assert "amount_negative_or_invalid" in reasons
+    assert all(item["stage"] == "ingest_orders" for item in body["items"])
+
+    resp = seeded_client.get(
+        "/error-events", params={"reason": "amount_negative_or_invalid"}
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total"] >= 1
+    assert all(item["reason"] == "amount_negative_or_invalid" for item in body["items"])

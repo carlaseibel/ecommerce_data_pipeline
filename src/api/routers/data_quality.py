@@ -8,7 +8,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from src.api.deps import get_db
-from src.api.schemas import DataQualityResponse, DataQualityRun
+from src.api.schemas import DataQualityResponse, DataQualityRun, ErrorEventSummary
 
 router = APIRouter()
 
@@ -21,7 +21,9 @@ def get_data_quality(conn: DbConn) -> DataQualityResponse:
         "SELECT run_id FROM data_quality_runs ORDER BY started_at DESC LIMIT 1"
     ).fetchone()
     if latest is None:
-        return DataQualityResponse(run_id=None, overall_success=False, stages=[])
+        return DataQualityResponse(
+            run_id=None, overall_success=False, stages=[], error_events_summary=[]
+        )
 
     run_id = latest[0]
     rows = conn.execute(
@@ -46,8 +48,25 @@ def get_data_quality(conn: DbConn) -> DataQualityResponse:
         )
         for r in rows
     ]
+
+    summary_rows = conn.execute(
+        """
+        SELECT stage, reason, COUNT(*) AS count
+        FROM error_events
+        WHERE run_id = ?
+        GROUP BY stage, reason
+        ORDER BY stage, reason
+        """,
+        (run_id,),
+    ).fetchall()
+    summary = [
+        ErrorEventSummary(stage=r["stage"], reason=r["reason"], count=r["count"])
+        for r in summary_rows
+    ]
+
     return DataQualityResponse(
         run_id=run_id,
         overall_success=all(s.success for s in stages),
         stages=stages,
+        error_events_summary=summary,
     )

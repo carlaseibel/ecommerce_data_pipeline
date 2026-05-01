@@ -46,7 +46,7 @@ def run(conn: sqlite3.Connection, raw_dir: Path, validations_dir: Path, run_id: 
     customer_ids = _existing_customer_ids(conn)
 
     cleaned: list[dict] = []
-    skipped = 0
+    quarantined = 0
 
     for row in raw:
         order_id = row.get("order_id")
@@ -56,33 +56,23 @@ def run(conn: sqlite3.Connection, raw_dir: Path, validations_dir: Path, run_id: 
         status = row.get("status")
         order_date = _parse_date(row.get("order_date"))
 
+        reason: str | None = None
         if cid is None:
+            reason = "customer_id_null"
+        elif int(cid) not in customer_ids:
+            reason = "customer_id_orphan"
+        elif not isinstance(amount, (int, float)) or amount < 0:
+            reason = "amount_negative_or_invalid"
+        elif order_date is None:
+            reason = "order_date_unparseable"
+
+        if reason is not None:
             log.warning(
-                "Pre-filter dropped row: customer_id is null",
-                extra={"run_id": run_id, "record_id": order_id},
+                "Quarantined row",
+                extra={"run_id": run_id, "record_id": order_id, "reason": reason},
             )
-            skipped += 1
-            continue
-        if int(cid) not in customer_ids:
-            log.warning(
-                "Pre-filter dropped row: orphaned customer_id",
-                extra={"run_id": run_id, "record_id": order_id},
-            )
-            skipped += 1
-            continue
-        if not isinstance(amount, (int, float)) or amount < 0:
-            log.warning(
-                "Pre-filter dropped row: negative or invalid amount",
-                extra={"run_id": run_id, "record_id": order_id},
-            )
-            skipped += 1
-            continue
-        if order_date is None:
-            log.warning(
-                "Pre-filter dropped row: unparseable order_date",
-                extra={"run_id": run_id, "record_id": order_id},
-            )
-            skipped += 1
+            data_quality.quarantine(conn, run_id, STAGE, order_id, reason, row)
+            quarantined += 1
             continue
 
         cleaned.append(
@@ -151,7 +141,7 @@ def run(conn: sqlite3.Connection, raw_dir: Path, validations_dir: Path, run_id: 
         extra={
             "run_id": run_id,
             "records_loaded": len(rows),
-            "records_skipped": skipped,
+            "records_quarantined": quarantined,
             "duration_ms": duration_ms,
         },
     )

@@ -51,3 +51,19 @@ def test_full_pipeline(tmp_warehouse, validations_dir, fake_exchange_client) -> 
 
     staging_count = tmp_warehouse.execute("SELECT COUNT(*) FROM staging_orders").fetchone()[0]
     assert staging_count == 0
+
+    quarantine = dict(
+        tmp_warehouse.execute(
+            "SELECT stage || '|' || reason AS k, COUNT(*) "
+            "FROM error_events WHERE run_id = ? GROUP BY k",
+            (run_id,),
+        ).fetchall()
+    )
+    assert quarantine == {
+        "ingest_customers|customer_id_duplicate": 1,
+        "ingest_orders|customer_id_null": 1,
+        "ingest_orders|customer_id_orphan": 1,
+        "ingest_orders|amount_negative_or_invalid": 1,
+        "ingest_events|customer_id_orphan": 1,
+        "ingest_events|timestamp_invalid": 1,
+    }

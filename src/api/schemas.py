@@ -73,7 +73,31 @@ class DataQualityRun(BaseModel):
     duration_ms: int
 
 
+class ErrorEventSummary(BaseModel):
+    stage: str
+    reason: str
+    count: int
+
+
 class DataQualityResponse(BaseModel):
     run_id: str | None
     overall_success: bool
     stages: list[DataQualityRun]
+    error_events_summary: list[ErrorEventSummary]
+
+
+class ErrorEvent(BaseModel):
+    id: int
+    run_id: str
+    stage: str
+    source_record_id: str | None
+    reason: str
+    raw_payload: str | None
+    occurred_at: datetime
+
+
+class ErrorEventListResponse(BaseModel):
+    items: list[ErrorEvent]
+    total: int
+    limit: int
+    offset: int

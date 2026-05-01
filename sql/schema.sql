@@ -60,3 +60,16 @@ CREATE TABLE IF NOT EXISTS data_quality_runs (
     PRIMARY KEY (run_id, stage)
 );
 CREATE INDEX IF NOT EXISTS idx_dq_started ON data_quality_runs(started_at DESC);
+
+CREATE TABLE IF NOT EXISTS error_events (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id            TEXT NOT NULL,
+    stage             TEXT NOT NULL,
+    source_record_id  TEXT,
+    reason            TEXT NOT NULL,
+    raw_payload       TEXT,
+    occurred_at       TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_error_events_run    ON error_events(run_id);
+CREATE INDEX IF NOT EXISTS idx_error_events_stage  ON error_events(stage);
+CREATE INDEX IF NOT EXISTS idx_error_events_reason ON error_events(reason);

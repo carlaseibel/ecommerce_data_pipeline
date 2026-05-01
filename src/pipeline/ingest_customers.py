@@ -23,10 +23,23 @@ def run(conn: sqlite3.Connection, raw_dir: Path, validations_dir: Path, run_id: 
     t0 = time.perf_counter()
 
     df = pd.read_csv(raw_dir / "customers.csv", dtype={"customer_id": "Int64"})
-    raw_count = len(df)
 
-    df = df.drop_duplicates(subset=["customer_id"], keep="first").reset_index(drop=True)
-    duplicates = raw_count - len(df)
+    dup_mask = df.duplicated(subset=["customer_id"], keep="first")
+    for dup_row in df[dup_mask].to_dict(orient="records"):
+        log.warning(
+            "Quarantined row",
+            extra={
+                "run_id": run_id,
+                "record_id": dup_row.get("customer_id"),
+                "reason": "customer_id_duplicate",
+            },
+        )
+        data_quality.quarantine(
+            conn, run_id, STAGE, dup_row.get("customer_id"), "customer_id_duplicate", dup_row
+        )
+    quarantined = int(dup_mask.sum())
+
+    df = df[~dup_mask].reset_index(drop=True)
 
     df["customer_id"] = df["customer_id"].astype(int)
     for col in ("name", "email", "country"):
@@ -69,7 +82,7 @@ def run(conn: sqlite3.Connection, raw_dir: Path, validations_dir: Path, run_id: 
         extra={
             "run_id": run_id,
             "records_loaded": len(rows),
-            "duplicates_dropped": duplicates,
+            "records_quarantined": quarantined,
             "duration_ms": duration_ms,
         },
     )

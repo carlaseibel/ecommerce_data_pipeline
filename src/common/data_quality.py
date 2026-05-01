@@ -10,8 +10,33 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
+
+
+def quarantine(
+    conn: sqlite3.Connection,
+    run_id: str,
+    stage: str,
+    source_record_id: Any,
+    reason: str,
+    raw_payload: Any,
+) -> None:
+    """Route a bad row into error_events instead of dropping it."""
+    conn.execute(
+        "INSERT INTO error_events "
+        "(run_id, stage, source_record_id, reason, raw_payload, occurred_at) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (
+            run_id,
+            stage,
+            None if source_record_id is None else str(source_record_id),
+            reason,
+            json.dumps(raw_payload, default=str),
+            datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        ),
+    )
 
 
 @dataclass(frozen=True)
