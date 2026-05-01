@@ -37,9 +37,7 @@ def list_error_events(
         params.append(reason)
     where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
 
-    total = conn.execute(
-        f"SELECT COUNT(*) FROM error_events {where}", tuple(params)
-    ).fetchone()[0]
+    total = conn.execute(f"SELECT COUNT(*) FROM error_events {where}", tuple(params)).fetchone()[0]
     rows = conn.execute(
         f"SELECT id, run_id, stage, source_record_id, reason, raw_payload, occurred_at "
         f"FROM error_events {where} ORDER BY id DESC LIMIT ? OFFSET ?",

@@ -100,9 +100,7 @@ def test_error_events_listing(seeded_client: TestClient) -> None:
     assert "amount_negative_or_invalid" in reasons
     assert all(item["stage"] == "ingest_orders" for item in body["items"])
 
-    resp = seeded_client.get(
-        "/error-events", params={"reason": "amount_negative_or_invalid"}
-    )
+    resp = seeded_client.get("/error-events", params={"reason": "amount_negative_or_invalid"})
     assert resp.status_code == 200
     body = resp.json()
     assert body["total"] >= 1
