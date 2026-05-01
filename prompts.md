@@ -43,6 +43,9 @@ came out of them. Per `CLAUDE.md`, every non-obvious decision is recorded here.
 
 ## 2026-04-30 — Architecture design revised: Great Expectations as DQ framework
 
+> **[SUPERSEDED 2026-05-01]** — GX was removed and replaced with a pandas-based validator
+> reading declarative rules from `validations/*.json`. See "Removed Great Expectations".
+
 **Prompt:** `docs/data_architecture_design_prompt.md` (re-run with framework constraint)
 **Output:** `docs/data_architecture.md` (rewritten)
 
@@ -124,6 +127,102 @@ brittle `sleep 3`), and makes the Makefile targets one-liners.
 - Makefile delegates to compose; CI calls Make, so the chain stays single-sourced.
 - `env_file` references `.env` with `required: false` so the container falls back to
   defaults in `src/common/config.py` when no `.env` is present.
+
+---
+
+## 2026-05-01 — Removed Great Expectations
+
+**Prompt:** "remove gx from this version" — after several runtime errors trying to make
+GX 1.x's `FileDataContext` + `ValidationDefinition` + `Checkpoint` chain serialize
+correctly (`ResourceFreshnessAggregateError: ExpectationSuite must be added to the
+DataContext before it can be updated`, `validation_definition_store_name` rejected by
+the YAML schema, `project_root_dir` vs `context_root_dir` doubling the path to
+`gx/gx/`, etc.). Each fix exposed another schema/serialization mismatch in GX 1.17 that
+wasn't worth chasing for a project where the validation rules are simple, declarative,
+and small.
+
+**Why:** GX's value-add for this project (auto-generated Data Docs, rich
+ValidationResult JSON, store backends) wasn't load-bearing — the rules are six pandas
+predicates on dataframes of <10 rows. The runtime cost of debugging GX 1.x internals
+exceeded any benefit; a hand-rolled validator using the same JSON spec gives equivalent
+behaviour with no opaque framework state.
+
+**How to apply:**
+- `gx/` removed entirely. Suite JSONs moved to `validations/<name>.json` with the
+  `_suite` suffix dropped (`customers_suite.json` → `customers.json` etc.).
+- Format simplified: `{"type": "expect_column_..."}` → `{"type": "column_exists" |
+  "not_null" | "unique" | "between" | "in_set" | "matches_strftime" | "matches_regex"}`.
+  Six rule types cover every original expectation.
+- `src/common/data_quality.py` rewritten as a small dispatcher: read JSON →
+  iterate rules → call the matching pandas predicate → collect failures → return
+  `CheckpointResult`. Same public API as before (`run_checkpoint`, `record_run`), so
+  pipeline stages didn't change shape.
+- `great_expectations` removed from `pyproject.toml`, unblocking install on Python 3.14
+  and shedding ~80 transitive deps.
+- `data_quality_runs` table kept — same purpose, just populated by our validator now.
+  Field name `checkpoint` retained for API compatibility even though there is no GX
+  checkpoint anymore; reads as "rule-set name" now.
+- CI's `publish-data-docs` job removed (later replaced by `publish-image` to GHCR).
+
+---
+
+## 2026-05-01 — Exchange-rate provider: exchangerate-api.com; httpx URL logging silenced
+
+**Why:** `exchangerate.host` (the previous default) silently moved its free tier behind
+APILayer with mandatory `access_key`. Both keyless and keyed requests returned HTTP 200
+with `{"success": false, "error": ...}` — no `rates` field — so our client raised
+`unexpected payload`. The user supplied an `exchangerate-api.com` key, which uses a
+different shape entirely: API key in the URL **path** (`/v6/{key}/latest/USD`), and
+rates under `conversion_rates` (not `rates`). At the same time, httpx's INFO logger
+emitted the full request URL (with key) to stdout — observable in plain text in
+container logs.
+
+**How to apply:**
+- `src/common/exchange_rate_client.py` rewritten: builds `{base_url}/{api_key}/latest/USD`,
+  reads `conversion_rates`, validates `result == "success"`, inverts to `rate_to_usd`.
+- Default `EXCHANGE_RATE_API_URL` flipped to `https://v6.exchangerate-api.com/v6` (the
+  base, no key/path). Key is supplied separately via `EXCHANGE_RATE_API_KEY`.
+- `src/common/logging.py` now sets `httpx`, `httpcore`, `urllib3` loggers to `WARNING`
+  during `configure()` — request URLs (which contain the key) never reach stdout.
+  Pipeline still emits its own structured log lines for the fetch.
+
+---
+
+## 2026-05-01 — Lint cleanup: `Annotated[..., Depends()]`, `datetime.UTC`, `collections.abc.Callable`
+
+**Why:** CI `make lint` failed on 14 ruff violations: 9 × UP017 (`timezone.utc` →
+`datetime.UTC` alias), 1 × UP035 (`Callable` should come from `collections.abc`),
+4 × B008 (`Depends(...)` in argument defaults), and 1 × I001 (import sort). Earlier
+attempts to auto-fix from inside the running container didn't take because source code
+is `COPY`'d at image build time, not bind-mounted — fixes never reached the host repo.
+
+**How to apply:**
+- Ran `ruff check --fix && ruff format` from the local `.venv` (which now installs
+  cleanly on Python 3.14 since GX is gone) — 22 errors auto-fixed.
+- The four B008s were rewritten manually to FastAPI's modern recommended pattern:
+  per-router `DbConn = Annotated[sqlite3.Connection, Depends(get_db)]` typedef, then
+  `def handler(conn: DbConn, ...)`. Cleaner than ignoring B008, and FastAPI parses it
+  identically.
+- B008-fixed handlers had to reorder params: `Annotated`/`Depends` parameters must
+  precede those with defaults (Python rule), so `conn` moved to the first position.
+
+---
+
+## 2026-05-01 — SQLite `check_same_thread=False`
+
+**Why:** Five `tests/integration/test_api.py` cases failed with
+`sqlite3.ProgrammingError: SQLite objects created in a thread can only be used in that
+same thread`. The conftest fixture creates a connection on the test thread; FastAPI
+`TestClient` dispatches requests on a worker thread; the dependency override hands the
+test-thread connection to the worker — violation.
+
+**How to apply:** `src/common/db.py:connect()` now passes `check_same_thread=False`.
+Safe because (a) production uses one connection per request within a single worker
+thread anyway, (b) tests are single-threaded from sqlite's perspective (TestClient
+serialises requests), and (c) the only writers are pipeline stages running
+sequentially. After the fix all 12 tests pass on Python 3.14 locally.
+
+---
 
 ## 2026-05-01 — Forward EXCHANGE_RATE_API_* into containers via `environment:`
 
