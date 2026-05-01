@@ -1,0 +1,30 @@
+services:
+  pipeline:
+    image: ecommerce-pipeline:latest
+    build: .
+    command: python -m src.pipeline.run
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - ./raw_data:/app/raw_data
+      - ./data:/app/data
+      - ./validations:/app/validations
+
+  api:
+    image: ecommerce-pipeline:latest
+    build: .
+    command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/healthz').status==200 else 1)"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s

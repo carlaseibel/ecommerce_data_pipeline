@@ -1,0 +1,13 @@
+{
+  "name": "orders_clean",
+  "rules": [
+    {"type": "column_exists", "column": "order_id"},
+    {"type": "unique", "column": "order_id"},
+    {"type": "not_null", "column": "customer_id"},
+    {"type": "between", "column": "amount_original", "min": 0, "strict_min": false},
+    {"type": "in_set", "column": "status", "values": ["completed", "cancelled"]},
+    {"type": "matches_strftime", "column": "order_date", "format": "%Y-%m-%d"},
+    {"type": "matches_regex", "column": "currency_original", "regex": "^[A-Z]{3}$"}
+  ],
+  "purpose": "Post-clean gate for staging_orders: customer_id not null, amount >= 0, status in canonical set, date ISO, currency ISO-4217."
+}

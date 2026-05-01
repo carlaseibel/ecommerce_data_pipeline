@@ -1,0 +1,11 @@
+{
+  "name": "exchange_rates",
+  "rules": [
+    {"type": "column_exists", "column": "currency"},
+    {"type": "column_exists", "column": "rate_to_usd"},
+    {"type": "matches_regex", "column": "currency", "regex": "^[A-Z]{3}$"},
+    {"type": "unique", "column": "currency"},
+    {"type": "between", "column": "rate_to_usd", "min": 0, "strict_min": true}
+  ],
+  "purpose": "Gate for fetched exchange rates: currency ISO-4217, rate_to_usd > 0."
+}

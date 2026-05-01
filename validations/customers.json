@@ -1,0 +1,13 @@
+{
+  "name": "customers",
+  "rules": [
+    {"type": "column_exists", "column": "customer_id"},
+    {"type": "column_exists", "column": "email"},
+    {"type": "column_exists", "column": "created_at"},
+    {"type": "not_null", "column": "customer_id"},
+    {"type": "unique", "column": "customer_id"},
+    {"type": "not_null", "column": "email"},
+    {"type": "matches_strftime", "column": "created_at", "format": "%Y-%m-%d"}
+  ],
+  "purpose": "Post-clean contract for customers: PK uniqueness, email not null, created_at ISO date."
+}

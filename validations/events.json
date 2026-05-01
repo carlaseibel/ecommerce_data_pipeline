@@ -1,0 +1,11 @@
+{
+  "name": "events",
+  "rules": [
+    {"type": "column_exists", "column": "event_id"},
+    {"type": "unique", "column": "event_id"},
+    {"type": "not_null", "column": "customer_id"},
+    {"type": "in_set", "column": "event_type", "values": ["login", "purchase", "logout", "signup"]},
+    {"type": "matches_strftime", "column": "event_timestamp", "format": "%Y-%m-%dT%H:%M:%SZ"}
+  ],
+  "purpose": "Post-clean gate for events: PK unique, customer_id present, event_type canonical, timestamp ISO-8601 UTC."
+}

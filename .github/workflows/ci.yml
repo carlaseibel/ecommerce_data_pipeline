@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e ".[dev]"
+      - run: make lint
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e ".[dev]"
+      - run: make test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage
+          path: coverage.xml
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - run: make build
+
+  pipeline:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - run: make build
+      - run: cp .env.example .env
+      - run: make pipeline
+      - run: |
+          test -s data/warehouse.sqlite
+          docker run --rm -v $PWD/data:/app/data ecommerce-pipeline \
+            python -c "import sqlite3; \
+              c=sqlite3.connect('data/warehouse.sqlite'); \
+              n=c.execute('SELECT COUNT(*) FROM orders').fetchone()[0]; \
+              assert n>0, 'orders table is empty'; print(f'orders: {n}')"
+
+  api-smoke:
+    runs-on: ubuntu-latest
+    needs: pipeline
+    steps:
+      - uses: actions/checkout@v4
+      - run: make build
+      - run: cp .env.example .env
+      - run: make pipeline
+      - run: make api-smoke
+
+  publish-data-docs:
+    runs-on: ubuntu-latest
+    needs: pipeline
+    steps:
+      - uses: actions/checkout@v4
+      - run: make build
+      - run: cp .env.example .env
+      - run: make pipeline
+      - run: make data-docs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: data-docs
+          path: gx/uncommitted/data_docs/local_site
