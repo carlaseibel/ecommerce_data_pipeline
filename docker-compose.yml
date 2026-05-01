@@ -6,6 +6,9 @@ services:
     env_file:
       - path: .env
         required: false
+    environment:
+      EXCHANGE_RATE_API_KEY: ${EXCHANGE_RATE_API_KEY:-}
+      EXCHANGE_RATE_API_URL: ${EXCHANGE_RATE_API_URL:-https://v6.exchangerate-api.com/v6}
     volumes:
       - ./raw_data:/app/raw_data
       - ./data:/app/data
@@ -18,6 +21,9 @@ services:
     env_file:
       - path: .env
         required: false
+    environment:
+      EXCHANGE_RATE_API_KEY: ${EXCHANGE_RATE_API_KEY:-}
+      EXCHANGE_RATE_API_URL: ${EXCHANGE_RATE_API_URL:-https://v6.exchangerate-api.com/v6}
     volumes:
       - ./data:/app/data
     ports:
